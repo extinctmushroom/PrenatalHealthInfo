@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — Willow</title>
+  <meta name="description" content="Sign in or create your Willow account to track your preconception health.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f7a63'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white'%3E%E2%9D%80%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-base="">
+  <div id="site-header"></div>
+
+  <main class="auth-wrap">
+    <div class="card card-pad-lg auth-card">
+      <div class="text-center mb-2">
+        <span class="mark" style="width:44px;height:44px;font-size:22px;border-radius:12px;margin:0 auto 12px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--brand),var(--accent))">❀</span>
+        <h1>Welcome to Willow</h1>
+        <p class="mb-0">Track your preconception journey.</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="active" data-mode="signin">Sign in</button>
+        <button data-mode="signup">Create account</button>
+      </div>
+
+      <div class="auth-msg" id="authMsg"></div>
+
+      <form id="authForm" novalidate>
+        <div class="field hidden" id="field-name">
+          <label for="username">Username</label>
+          <input class="input" id="username" type="text" autocomplete="nickname" placeholder="e.g. rosa_m">
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input class="input" id="email" type="email" autocomplete="email" required placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input class="input" id="password" type="password" autocomplete="current-password" required placeholder="At least 6 characters">
+        </div>
+        <button class="btn btn-primary btn-block" id="authSubmit" type="submit">Sign in</button>
+      </form>
+
+      <div class="auth-alt">
+        <a href="#" id="forgotLink">Forgot password?</a> · <a href="guide.html">Browse the guide</a>
+      </div>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+  <script src="js/layout.js" defer></script>
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>
