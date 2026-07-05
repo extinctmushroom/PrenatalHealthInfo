@@ -7,7 +7,8 @@ export const DEFAULT_SUPPLEMENTS = [
   { id: "prenatal",name: "Prenatal multivitamin", note: "Covers iron 18–27 mg, B12, zinc" },
   { id: "vitd",    name: "Vitamin D",             note: "600–2000 IU daily (per your levels)" },
   { id: "omega3",  name: "Omega-3 (DHA)",         note: "250–300 mg DHA daily" },
-  { id: "iodine",  name: "Iodine",                note: "150–250 mcg daily" },
+  { id: "iodine",  name: "Iodine",                note: "150 mcg daily (220 once pregnant)" },
+  { id: "choline", name: "Choline",               note: "425 mg daily · often missing from prenatals" },
   { id: "water",   name: "Hydration",             note: "~8–10 cups of water" },
 ];
 

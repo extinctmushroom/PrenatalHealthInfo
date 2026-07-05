@@ -4,6 +4,7 @@
    dependency on the Firebase CDN. */
 import { initFirebase } from "./firebase-init.js";
 import { DEFAULT_SUPPLEMENTS, EXERCISE_SUGGESTIONS, MEAL_IDEAS, GOALS } from "./content.js";
+import { blankProfile, computeCycle, PHASE_COLOR } from "./cycle.js";
 
 const app = document.getElementById("dashApp");
 const { auth, db, authMod, fsMod } = await initFirebase();
@@ -24,20 +25,29 @@ function blankDay() { return { exercise: [], supplements: {}, water: 0, meals: [
 function firestoreStore(uid) {
   const { doc, getDoc, setDoc } = fsMod;
   const ref = (d) => doc(db, "users", uid, "days", d);
+  const profileRef = doc(db, "users", uid, "profile", "cycle");
   return {
     async get(dateStr) {
       const snap = await getDoc(ref(dateStr));
       return snap.exists() ? { ...blankDay(), ...snap.data() } : blankDay();
     },
     async set(dateStr, data) { await setDoc(ref(dateStr), data); },
+    async getProfile() {
+      const snap = await getDoc(profileRef);
+      return snap.exists() ? { ...blankProfile(), ...snap.data() } : blankProfile();
+    },
+    async setProfile(data) { await setDoc(profileRef, data); },
   };
 }
 function localStore() {
   const KEY = "willow-demo-days";
+  const PKEY = "willow-demo-profile";
   const all = () => JSON.parse(localStorage.getItem(KEY) || "{}");
   return {
     async get(dateStr) { return { ...blankDay(), ...(all()[dateStr] || {}) }; },
     async set(dateStr, data) { const a = all(); a[dateStr] = data; localStorage.setItem(KEY, JSON.stringify(a)); },
+    async getProfile() { return { ...blankProfile(), ...JSON.parse(localStorage.getItem(PKEY) || "{}") }; },
+    async setProfile(data) { localStorage.setItem(PKEY, JSON.stringify(data)); },
   };
 }
 
@@ -54,16 +64,23 @@ async function start(store, user) {
   const today = iso(new Date());
   const week = weekDates();
 
-  // Load this week's days.
+  // Load this week's days + cycle profile.
   const days = {};
   await Promise.all(week.map(async (d) => { days[iso(d)] = await store.get(iso(d)); }));
   let day = days[today];
+  let profile = await store.getProfile();
 
   render();
 
   async function save() {
     days[today] = day;
     await store.set(today, day);
+    render();
+  }
+
+  async function saveProfile(patch) {
+    profile = { ...profile, ...patch };
+    await store.setProfile(profile);
     render();
   }
 
@@ -84,6 +101,8 @@ async function start(store, user) {
   function render() {
     const t = totals();
     const name = user.displayName || (user.email || "there").split("@")[0];
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
     const demoBanner = user.demo ? `
       <div class="config-banner">
         <strong>Demo mode.</strong> Firebase isn't configured, so your data is saved only in this browser.
@@ -95,7 +114,7 @@ async function start(store, user) {
       <div class="dash-head">
         <div>
           <span class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</span>
-          <h1 style="margin:.2em 0 0">Hello, ${esc(name)} 🌿</h1>
+          <h1 style="margin:.2em 0 0">${greeting}, ${esc(name)} 🌿</h1>
           <p class="mb-0" style="max-width:52ch">Small, consistent habits in the 90 days before conception shape egg quality and hormone balance. Here's your week.</p>
         </div>
       </div>
@@ -106,6 +125,8 @@ async function start(store, user) {
         ${tile("Supplements today", `${t.suppDone}<small>/${t.suppTotal}</small>`, "daily checklist")}
         ${tile("Water today", `${day.water}<small> cups</small>`, "aim ~8–10")}
       </div>
+
+      ${cycleCard(profile, today)}
 
       <div class="grid" style="grid-template-columns:1.15fr .85fr; margin-top:18px" id="topGrid">
         <div class="card card-pad-lg">
@@ -145,7 +166,7 @@ async function start(store, user) {
             ${day.exercise.length ? day.exercise.map((e,i)=>`
               <li><span class="dot"></span><span class="li-main">${esc(e.title)} <span class="tag">${esc(e.intensity)}</span></span>
               <span class="small">${e.mins} min</span><button class="li-del" data-ex="${i}" aria-label="Delete">✕</button></li>`).join("")
-              : `<li class="muted" style="border:none">No workouts logged today yet.</li>`}
+              : `<li class="muted" style="border:none">Nothing logged yet today — even a short walk counts 🌱</li>`}
           </ul>
         </div>
 
@@ -187,7 +208,7 @@ async function start(store, user) {
               <li><span class="dot" style="background:var(--accent)"></span><span class="li-main">${esc(m.title)}
               ${(m.tags||[]).map(tg=>`<span class="tag">${esc(tg)}</span>`).join(" ")}</span>
               <button class="li-del" data-meal="${i}" aria-label="Delete">✕</button></li>`).join("")
-              : `<li class="muted" style="border:none">No meals logged today yet.</li>`}
+              : `<li class="muted" style="border:none">No meals logged yet today — add one below, or try a suggestion 🍽️</li>`}
           </ul>
         </div>
 
@@ -276,7 +297,73 @@ async function start(store, user) {
       const m = JSON.parse(decodeURIComponent(b.dataset.suggestMeal));
       day.meals.push({ title: m.title, tags: m.tags }); save();
     }));
+    byId("startCycle")?.addEventListener("click", () => {
+      const start = val("cycleStart") || today;
+      const len = Math.max(15, Math.min(60, Number(val("cycleLen")) || 28));
+      saveProfile({ lastPeriodStart: start, cycleLength: len });
+    });
+    byId("logPeriodToday")?.addEventListener("click", () => {
+      saveProfile({ lastPeriodStart: today });
+    });
   }
+}
+
+/* ---------- Cycle card ---------- */
+function cycleCard(profile, todayIso) {
+  const cyc = computeCycle(profile, todayIso);
+
+  if (!cyc) {
+    return `
+      <div class="card card-pad-lg mt-2" id="cycleCard">
+        <h3 style="margin:0 0 4px">🌸 Track your cycle</h3>
+        <p class="small" style="margin:0 0 14px">Log your last period's start date to see your cycle day, estimated fertile window, and next period — right alongside your hormone-health habits.</p>
+        <div class="row-inline">
+          <div class="field"><label for="cycleStart">Last period started</label><input class="input" id="cycleStart" type="date" max="${todayIso}" value="${todayIso}"></div>
+          <div class="field"><label for="cycleLen">Average cycle length</label><input class="input" id="cycleLen" type="number" min="15" max="60" value="${profile.cycleLength || 28}"></div>
+        </div>
+        <button class="btn btn-primary" id="startCycle">Start tracking my cycle</button>
+        <p class="disclaimer mt-2" style="border:none;padding-top:0">Estimates only, based on average cycle length — not a contraceptive method. Cycles vary, especially with PCOS; track a few cycles to see your own pattern.</p>
+      </div>`;
+  }
+
+  const fertilePct = { start: pct(cyc.fertileStart - 1, cyc.cycleLength), end: pct(cyc.fertileEnd, cyc.cycleLength) };
+  const dayPct = pct(cyc.cycleDay, cyc.cycleLength);
+  const color = PHASE_COLOR[cyc.phase] || "var(--brand)";
+  const fmt = (iso) => new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+  return `
+    <div class="card card-pad-lg mt-2" id="cycleCard">
+      <div class="flex between items-center wrap gap-2 mb-2">
+        <div>
+          <h3 style="margin:0">🌸 Your cycle</h3>
+          <p class="small mb-0" style="margin-top:2px">Day ${cyc.cycleDay} of ~${cyc.cycleLength} · <span class="pill" style="background:color-mix(in srgb, ${color} 16%, transparent); color:${color}">${cyc.phase}</span></p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="logPeriodToday">🩸 Period started today</button>
+      </div>
+
+      <div class="cycle-meter" role="img" aria-label="Cycle day ${cyc.cycleDay} of ${cyc.cycleLength}, phase ${cyc.phase}">
+        <div class="cycle-meter-fertile" style="left:${(fertilePct.start*100).toFixed(1)}%; width:${((fertilePct.end-fertilePct.start)*100).toFixed(1)}%"></div>
+        <div class="cycle-meter-fill" style="width:${(dayPct*100).toFixed(1)}%; background:${color}"></div>
+        <div class="cycle-meter-marker" style="left:${(dayPct*100).toFixed(1)}%"></div>
+      </div>
+      <div class="flex between small muted" style="margin-top:6px"><span>Period</span><span>Fertile window</span><span>Next period</span></div>
+
+      <div class="grid grid-3 mt-2">
+        <div class="stat-tile"><div class="label">Estimated ovulation</div><div class="value" style="font-size:1.3rem">${fmt(cyc.fertileEndDate)}</div></div>
+        <div class="stat-tile"><div class="label">Fertile window</div><div class="value" style="font-size:1.3rem">${fmt(cyc.fertileStartDate)}–${fmt(cyc.fertileEndDate)}</div></div>
+        <div class="stat-tile"><div class="label">Next period (est.)</div><div class="value" style="font-size:1.3rem">${fmt(cyc.nextPeriodDate)}</div><div class="sub">in ${cyc.daysUntilNextPeriod} day${cyc.daysUntilNextPeriod===1?"":"s"}</div></div>
+      </div>
+
+      <details class="mt-2">
+        <summary class="small" style="cursor:pointer;color:var(--ink-2);font-weight:600">Edit cycle settings</summary>
+        <div class="row-inline mt-2">
+          <div class="field"><label for="cycleStart">Last period started</label><input class="input" id="cycleStart" type="date" max="${todayIso}" value="${profile.lastPeriodStart}"></div>
+          <div class="field"><label for="cycleLen">Average cycle length</label><input class="input" id="cycleLen" type="number" min="15" max="60" value="${cyc.cycleLength}"></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="startCycle">Save changes</button>
+      </details>
+      <p class="disclaimer mt-2" style="border:none;padding-top:0">Estimates only, based on your average cycle length — not a contraceptive method. See <a href="guide.html#hormones">how your cycle works →</a></p>
+    </div>`;
 }
 
 /* ---------- Render helpers ---------- */
@@ -320,7 +407,7 @@ function weekChart(week, days) {
     grid.push(`<text x="${padL-6}" y="${gy+3}" text-anchor="end" style="font:500 10px var(--font);fill:var(--ink-3)">${Math.round(g)}</text>`);
   }
   const bars = data.map((v,i) => {
-    const bx = x(i), by = y(v), bh = padT + plotH - by;
+    const bx = x(i), by = y(v);
     const isToday = i === todayIdx;
     const fill = isToday ? "var(--series-move)" : "color-mix(in srgb, var(--series-move) 55%, var(--surface-2))";
     const rounded = v > 0 ? 4 : 0;
