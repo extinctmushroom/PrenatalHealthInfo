@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About &amp; sources — Willow</title>
+  <meta name="description" content="How Willow is built, how we source information, privacy, and the medical disclaimer.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f7a63'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white'%3E%E2%9D%80%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-base="">
+  <div id="site-header"></div>
+
+  <section class="hero" style="padding:52px 0 20px" id="main-content">
+    <div class="container narrow">
+      <span class="pill">About</span>
+      <h1 style="margin:14px 0 0">A calm, honest companion for the months before pregnancy</h1>
+      <p class="lead">Willow exists to make trustworthy preconception information easy to find, understand, and act on — without the noise, fear, or unsourced claims that fill so much of this space.</p>
+    </div>
+  </section>
+
+  <main class="container narrow" style="padding-bottom:60px">
+    <div class="card card-pad-lg">
+      <h2 style="margin-top:0">How we source information</h2>
+      <p>Every recommendation in the <a href="guide.html">guide</a> is tied to a numbered reference. We prioritize, in order:</p>
+      <ol>
+        <li><strong>Major clinical bodies</strong> — the American College of Obstetricians and Gynecologists (ACOG), the CDC, and the WHO.</li>
+        <li><strong>Government nutrition authorities</strong> — the NIH Office of Dietary Supplements fact sheets.</li>
+        <li><strong>Peer-reviewed research</strong> — randomized trials and reviews indexed in PubMed / PMC.</li>
+      </ol>
+      <p>Where evidence is preliminary or mixed (for example, CoQ10 for egg quality), we say so plainly rather than overstating it. Guidelines change; we note that individual advice always belongs with your own clinician.</p>
+    </div>
+
+    <div class="grid grid-2 mt-2">
+      <div class="card">
+        <h3 style="margin-top:0">🔒 Your data &amp; privacy</h3>
+        <p class="small">When Firebase is configured, your tracking data (workouts, supplements, notes) is stored privately under your own account and is only readable by you, enforced by Firestore security rules. If Firebase isn't set up, the dashboard runs in a local "demo mode" that keeps data only in your browser.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">🛠️ How it's built</h3>
+        <p class="small">A fast, static site (HTML/CSS/vanilla JS) designed for GitHub Pages, with Firebase Authentication for accounts and Cloud Firestore for private, per-user tracking. No build step, no tracking pixels.</p>
+      </div>
+    </div>
+
+    <div class="card card-pad-lg mt-2" id="disclaimer">
+      <span class="pill rose">Important</span>
+      <h2>Medical disclaimer</h2>
+      <p>Willow provides general educational information about preconception health. <strong>It is not medical advice, diagnosis, or treatment</strong>, and using it does not create a clinician–patient relationship. It cannot account for your personal medical history, medications, or conditions.</p>
+      <p>Always consult a qualified healthcare professional before starting supplements, changing medications, or making significant lifestyle changes — particularly if you have a chronic condition (such as diabetes, thyroid disease, or PCOS), take prescription medication, or have had a prior pregnancy complication. If you have an urgent medical concern, contact your clinician or local emergency services.</p>
+    </div>
+
+    <div class="text-center mt-3">
+      <a href="guide.html" class="btn btn-primary">Read the guide</a>
+      <a href="login.html" class="btn btn-ghost">Create your dashboard</a>
+    </div>
+  </main>
+
+  <div id="site-footer"></div>
+  <script src="js/layout.js" defer></script>
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>
