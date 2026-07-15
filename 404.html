@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — Willow</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f7a63'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white'%3E%E2%9D%80%3C/text%3E%3C/svg%3E">
+  <!-- Self-contained: GitHub Pages serves 404.html at any path depth, so no
+       relative CSS/JS references can be trusted here. -->
+  <style>
+    :root { --plane:#f7f4ef; --surface:#fff; --ink:#1f1d18; --ink-2:#5f5b52; --brand:#4f7a63; --accent:#c26a80; --line:#e7e2d8; }
+    @media (prefers-color-scheme: dark) {
+      :root { --plane:#14130f; --surface:#1e1c17; --ink:#f4f1ea; --ink-2:#c4bfb2; --brand:#7fae94; --accent:#d98da0; --line:#302c22; }
+    }
+    :root[data-theme="dark"] { --plane:#14130f; --surface:#1e1c17; --ink:#f4f1ea; --ink-2:#c4bfb2; --brand:#7fae94; --accent:#d98da0; --line:#302c22; }
+    :root[data-theme="light"] { --plane:#f7f4ef; --surface:#fff; --ink:#1f1d18; --ink-2:#5f5b52; --brand:#4f7a63; --accent:#c26a80; --line:#e7e2d8; }
+    body {
+      margin:0; min-height:100vh; display:grid; place-items:center;
+      background:var(--plane); color:var(--ink);
+      font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    }
+    .card {
+      background:var(--surface); border:1px solid var(--line); border-radius:18px;
+      padding:44px 40px; max-width:430px; margin:20px; text-align:center;
+      box-shadow:0 6px 24px rgba(0,0,0,.07);
+    }
+    .mark {
+      width:52px; height:52px; border-radius:14px; margin:0 auto 18px;
+      display:grid; place-items:center; color:#fff; font-size:26px;
+      background:linear-gradient(135deg,var(--brand),var(--accent));
+    }
+    h1 { font-family:Georgia,"Times New Roman",serif; font-size:1.7rem; margin:0 0 8px; }
+    p { color:var(--ink-2); line-height:1.6; margin:0 0 22px; }
+    a.btn {
+      display:inline-block; background:var(--brand); color:#fff; text-decoration:none;
+      padding:12px 24px; border-radius:11px; font-weight:600; font-size:.95rem;
+    }
+  </style>
+  <script>try{var t=localStorage.getItem("willow-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">❀</div>
+    <h1>This page wandered off</h1>
+    <p>The page you're looking for doesn't exist or has moved. Let's get you back to solid ground.</p>
+    <a class="btn" id="homeLink" href="/">← Back to Willow</a>
+  </main>
+  <script>
+    // On a GitHub Pages *project* site, home is /<repo>/, not /.
+    (function () {
+      var seg = location.pathname.split("/").filter(Boolean)[0];
+      if (location.hostname.endsWith("github.io") && seg) {
+        document.getElementById("homeLink").href = "/" + seg + "/";
+      }
+    })();
+  </script>
+</body>
+</html>
