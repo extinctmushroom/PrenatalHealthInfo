@@ -6,7 +6,7 @@ import { initFirebase, isConfigured } from "./firebase-init.js";
 
 const base = document.body.dataset.base || "";
 const configured = isConfigured();
-const { auth, authMod } = await initFirebase();
+const { auth, authMod, loadError } = await initFirebase();
 
 /* ---------- Header auth slot ---------- */
 function paintAuthSlot(user) {
@@ -15,7 +15,7 @@ function paintAuthSlot(user) {
   if (user) {
     const name = user.displayName || user.email.split("@")[0];
     slot.innerHTML =
-      `<a href="${base}dashboard.html" class="btn btn-ghost btn-sm" title="${user.email}">${escapeHtml(name)}</a>
+      `<a href="${base}dashboard.html" class="btn btn-ghost btn-sm" title="${escapeHtml(user.email)}">${escapeHtml(name)}</a>
        <button class="btn btn-sm" id="signOutBtn"
          style="background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)">Sign out</button>`;
     const so = document.getElementById("signOutBtn");
@@ -52,7 +52,9 @@ function initLoginPage() {
   let mode = "signin";
 
   if (!configured || !auth) {
-    showMsg("Firebase isn't configured yet. Add your project keys in <code>js/firebase-config.js</code> to enable accounts. You can still browse the full guide and try the dashboard in demo mode.", "error");
+    showMsg(loadError
+      ? "We couldn't reach the sign-in service — check your connection and refresh. Your dashboard still works in this browser meanwhile."
+      : "Firebase isn't configured yet. Add your project keys in <code>js/firebase-config.js</code> to enable accounts. You can still browse the full guide and try the dashboard in demo mode.", "error");
     submitBtn.disabled = true;
   }
 
@@ -61,6 +63,8 @@ function initLoginPage() {
     tabs.forEach(x => x.classList.toggle("active", x === t));
     nameField.classList.toggle("hidden", mode !== "signup");
     submitBtn.textContent = mode === "signup" ? "Create account" : "Sign in";
+    // Hint password managers correctly: new password on signup, saved one on sign-in.
+    document.getElementById("password").setAttribute("autocomplete", mode === "signup" ? "new-password" : "current-password");
     hideMsg();
   }));
 
