@@ -135,10 +135,11 @@ your browser only) — everything else works immediately.
 
 ## Deployment
 
-This repo includes a GitHub Actions workflow
-([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) that deploys to
-GitHub Pages automatically on every push to `main`. Enable it under
-**Settings → Pages → Build and deployment → Source: "GitHub Actions."**
+This is a plain static site, so GitHub Pages can serve it directly with no
+build step. Enable it under **Settings → Pages → Build and deployment →
+Source: "Deploy from a branch"**, then pick `main` and `/ (root)`. GitHub
+rebuilds and redeploys automatically on every push to `main` — no workflow
+file needed.
 
 ## Project structure
 
@@ -161,15 +162,14 @@ GitHub Pages automatically on every push to `main`. Enable it under
 │   ├── cycle.js                # Menstrual cycle date math
 │   └── content.js              # Supplement, exercise & meal suggestion data
 ├── firestore.rules             # Security rules (paste into Firebase console)
-├── assets/screenshots/          # README images
-└── .github/workflows/pages.yml  # GitHub Pages deploy workflow
+└── assets/screenshots/          # README images
 ```
 
 ## Tech stack
 
 Vanilla HTML, CSS, and JavaScript (ES modules) — no framework, no bundler, no
 build step. Firebase Authentication and Cloud Firestore for accounts and data.
-Deployed on GitHub Pages via GitHub Actions.
+Deployed on GitHub Pages, served directly from `main`.
 
 ## License
 
