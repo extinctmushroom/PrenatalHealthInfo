@@ -2,8 +2,9 @@
 
 An evidence-based **knowledge base, guide, and personal dashboard** for women
 preparing their bodies before pregnancy. Willow turns trustworthy preconception
-science — hormone optimization, nutrition, exercise, and vitamins — into clear
-reading and daily, trackable habits.
+science — hormone optimization, your menstrual cycle, nutrition, exercise,
+vitamins, and emotional wellbeing — into clear reading and daily, trackable
+habits.
 
 > **Educational only — not medical advice.** Every recommendation is sourced to
 > ACOG, the CDC, the NIH Office of Dietary Supplements, the WHO, and
@@ -16,16 +17,18 @@ reading and daily, trackable habits.
 
 ## ✨ Features
 
-- **The Guide** — a fully-cited walkthrough across six chapters:
-  1. Preconception basics (checkups, folic acid timing, the 90-day window)
-  2. **Hormone optimization** — insulin/blood sugar, thyroid, cortisol, sleep, body composition, endocrine disruptors — what's actually in your control
+- **The Guide** — a fully-cited walkthrough across seven chapters:
+  1. Preconception basics (checkups, folic acid timing, the 90-day window) + an FAQ on time-to-conceive timelines, stopping birth control, irregular cycles, and when to see a specialist
+  2. **Hormone optimization** — a menstrual-cycle-and-hormones explainer (follicular/ovulation/luteal phases), plus what's actually in your control: insulin/blood sugar, thyroid, cortisol, sleep, body composition, endocrine disruptors
   3. Nutrition & diet
   4. Exercise & movement (with PCOS-specific guidance)
-  5. Vitamins & supplements (doses + food sources table)
+  5. Vitamins & supplements (doses + food sources table, verified against current NIH ODS fact sheets)
   6. Sleep, stress & environment
+  7. **Emotional wellbeing & support** — TTC-related stress/anxiety, ACOG guidance on mental health screening, and a verified resources table (988 Lifeline, RESOLVE, Postpartum Support International)
 - **Personal dashboard** (account-gated):
+  - **Menstrual cycle tracker** — logs last period start + average cycle length, computes cycle day, phase (menstrual/follicular/fertile window/luteal), estimated fertile window and next period, with a phase-colored meter
   - Weekly **exercise tracker** with an inline SVG bar chart + workout suggestions
-  - **Supplement checklist** with evidence-based daily targets
+  - **Supplement checklist** with evidence-based daily targets (folate, prenatal, vitamin D, omega-3, iodine, choline, hydration)
   - **Diet / meal** logging with nutrient-focused meal ideas
   - Water tracker and daily notes (energy, sleep, cycle, symptoms)
   - Progress **rings** and stat tiles against weekly goals (150 min movement, 2 strength sessions)
@@ -33,6 +36,7 @@ reading and daily, trackable habits.
 - **Cloud Firestore** for private, per-user tracking data
 - Light/dark theme, responsive, no build step
 - Runs in a local **demo mode** (browser storage) before Firebase is configured, so you can preview everything immediately
+- **Accessibility**: skip-to-content link, visible focus rings on all interactive elements, `prefers-reduced-motion` support
 
 ---
 
@@ -41,18 +45,19 @@ reading and daily, trackable habits.
 ```
 .
 ├── index.html          # Landing page
-├── guide.html          # The sourced knowledge base (6 chapters + references)
+├── guide.html          # The sourced knowledge base (7 chapters + references)
 ├── dashboard.html      # Account-gated tracking dashboard
 ├── login.html          # Sign in / create account
 ├── about.html          # About, sourcing method, privacy, disclaimer
 ├── css/
 │   └── styles.css      # Design system (light/dark)
 ├── js/
-│   ├── layout.js       # Shared header/footer, theme toggle, nav
+│   ├── layout.js       # Shared header/footer, theme toggle, nav, skip link
 │   ├── firebase-config.js  # ← put your Firebase keys here
 │   ├── firebase-init.js    # Shared Firebase app/auth/db instance
 │   ├── auth.js         # Sign in / sign up / route guard
 │   ├── dashboard.js    # Trackers, rings, weekly chart, Firestore/local storage
+│   ├── cycle.js        # Menstrual cycle date math (phase, fertile window, next period)
 │   └── content.js      # Supplement checklist, exercise & meal suggestions
 ├── firestore.rules     # Security rules (paste into Firebase console)
 ├── .github/workflows/pages.yml  # Auto-deploy to GitHub Pages

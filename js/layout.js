@@ -47,6 +47,7 @@
         <a href="${base}guide.html#nutrition">Nutrition</a>
         <a href="${base}guide.html#exercise">Exercise</a>
         <a href="${base}guide.html#vitamins">Vitamins</a>
+        <a href="${base}guide.html#wellbeing">Emotional wellbeing</a>
       </div>
       <div>
         <h4>Account</h4>
@@ -65,6 +66,10 @@
   const footMount = document.getElementById("site-footer");
   if (headMount) headMount.outerHTML = header;
   if (footMount) footMount.outerHTML = footer;
+
+  if (document.getElementById("main-content")) {
+    document.body.insertAdjacentHTML("afterbegin", `<a class="skip-link" href="#main-content">Skip to content</a>`);
+  }
 
   // Theme
   const root = document.documentElement;
