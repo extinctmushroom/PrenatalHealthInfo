@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Local tooling (none required to run this project, but kept in case)
+node_modules/
+npm-debug.log*
