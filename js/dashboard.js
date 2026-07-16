@@ -7,7 +7,7 @@ import { DEFAULT_SUPPLEMENTS, EXERCISE_SUGGESTIONS, MEAL_IDEAS, GOALS } from "./
 import { blankProfile, computeCycle, PHASE_COLOR } from "./cycle.js";
 
 const app = document.getElementById("dashApp");
-const { auth, db, authMod, fsMod } = await initFirebase();
+const { auth, db, authMod, fsMod, loadError } = await initFirebase();
 
 /* ---------- Boot ---------- */
 if (auth) {
@@ -16,7 +16,9 @@ if (auth) {
     // if no user, auth.js redirects to login
   });
 } else {
-  start(localStore(), { displayName: "Guest", email: "demo mode", demo: true });
+  // Unconfigured (demo) or SDK unreachable (offline) — either way, keep the
+  // dashboard usable with browser-local storage instead of a dead page.
+  start(localStore(), { displayName: "Guest", email: "demo mode", demo: true, offline: loadError });
 }
 
 /* ---------- Storage adapters ---------- */
@@ -99,15 +101,26 @@ async function start(store, user) {
   }
 
   function render() {
+    // Re-rendering replaces the DOM; remember what had keyboard focus so
+    // checklist/stepper users aren't dumped back to the top of the page.
+    const focused = document.activeElement;
+    const focusSel = focused?.dataset?.supp ? `[data-supp="${focused.dataset.supp}"]`
+      : (focused?.id === "waterPlus" || focused?.id === "waterMinus") ? `#${focused.id}`
+      : null;
+
     const t = totals();
     const name = user.displayName || (user.email || "there").split("@")[0];
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-    const demoBanner = user.demo ? `
+    const demoBanner = !user.demo ? "" : user.offline ? `
+      <div class="config-banner">
+        <strong>Connection issue.</strong> We couldn't reach the sync service, so your entries are being saved
+        in this browser for now. Refresh once you're back online to sign in and sync.
+      </div>` : `
       <div class="config-banner">
         <strong>Demo mode.</strong> Firebase isn't configured, so your data is saved only in this browser.
         Add your project keys in <code>js/firebase-config.js</code> to enable real accounts &amp; sync across devices.
-      </div>` : "";
+      </div>`;
 
     app.innerHTML = `
       ${demoBanner}
@@ -256,6 +269,7 @@ async function start(store, user) {
       <p class="disclaimer mt-3">Educational tracking only — not medical advice or diagnosis. Discuss supplements, medications, and any symptoms with your clinician, especially if you have a chronic condition or take prescription medication.</p>
     `;
     wire();
+    if (focusSel) app.querySelector(focusSel)?.focus();
   }
 
   function wire() {
