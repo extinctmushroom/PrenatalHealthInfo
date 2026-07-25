@@ -53,9 +53,22 @@ deployed on GitHub Pages, using Firebase for authentication and per-user data.
 </tr>
 </table>
 
-<div align="center">
-<img src="assets/screenshots/dashboard-dark.png" alt="Dashboard in dark mode" width="70%">
-</div>
+<table>
+<tr>
+<td width="50%">
+
+**Instant search** — indexed from the rendered guide
+<img src="assets/screenshots/guide-search.png" alt="Guide search showing highlighted matches for choline">
+
+</td>
+<td width="50%">
+
+**Dark mode** — a selected palette, not an inversion
+<img src="assets/screenshots/dashboard-dark.png" alt="Dashboard in dark mode">
+
+</td>
+</tr>
+</table>
 
 ## Features
 
