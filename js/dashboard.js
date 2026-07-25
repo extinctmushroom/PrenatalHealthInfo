@@ -4,7 +4,10 @@
    dependency on the Firebase CDN. */
 import { initFirebase } from "./firebase-init.js";
 import { DEFAULT_SUPPLEMENTS, EXERCISE_SUGGESTIONS, MEAL_IDEAS, GOALS } from "./content.js";
-import { blankProfile, computeCycle, PHASE_COLOR } from "./cycle.js";
+import {
+  blankProfile, normalizeProfile, computeCycle, cycleStats,
+  addPeriodStart, removePeriodStart, PHASE_COLOR, PHASE_NOTE,
+} from "./cycle.js";
 
 const app = document.getElementById("dashApp");
 const { auth, db, authMod, fsMod, loadError } = await initFirebase();
@@ -25,10 +28,25 @@ if (auth) {
 function blankDay() { return { exercise: [], supplements: {}, water: 0, meals: [], notes: "" }; }
 
 function firestoreStore(uid) {
-  const { doc, getDoc, setDoc } = fsMod;
+  const { doc, getDoc, setDoc, collection, getDocs, query, where, documentId } = fsMod;
+  const daysCol = collection(db, "users", uid, "days");
   const ref = (d) => doc(db, "users", uid, "days", d);
   const profileRef = doc(db, "users", uid, "profile", "cycle");
   return {
+    /* One range query instead of a getDoc per day. Document IDs are ISO dates,
+       which sort lexicographically, so a documentId() range covers the week.
+       Missing days aren't returned — and aren't billed as reads. */
+    async getRange(dateStrs) {
+      const out = {};
+      dateStrs.forEach((d) => { out[d] = blankDay(); });
+      const snap = await getDocs(query(
+        daysCol,
+        where(documentId(), ">=", dateStrs[0]),
+        where(documentId(), "<=", dateStrs[dateStrs.length - 1]),
+      ));
+      snap.forEach((d) => { out[d.id] = { ...blankDay(), ...d.data() }; });
+      return out;
+    },
     async get(dateStr) {
       const snap = await getDoc(ref(dateStr));
       return snap.exists() ? { ...blankDay(), ...snap.data() } : blankDay();
@@ -36,20 +54,34 @@ function firestoreStore(uid) {
     async set(dateStr, data) { await setDoc(ref(dateStr), data); },
     async getProfile() {
       const snap = await getDoc(profileRef);
-      return snap.exists() ? { ...blankProfile(), ...snap.data() } : blankProfile();
+      return normalizeProfile(snap.exists() ? snap.data() : null);
     },
     async setProfile(data) { await setDoc(profileRef, data); },
+    /* Every logged day, for export. */
+    async getAll() {
+      const snap = await getDocs(daysCol);
+      const out = {};
+      snap.forEach((d) => { out[d.id] = { ...blankDay(), ...d.data() }; });
+      return out;
+    },
   };
 }
 function localStore() {
   const KEY = "willow-demo-days";
   const PKEY = "willow-demo-profile";
-  const all = () => JSON.parse(localStorage.getItem(KEY) || "{}");
+  const all = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; } };
+  const readProfile = () => { try { return JSON.parse(localStorage.getItem(PKEY) || "{}"); } catch { return {}; } };
   return {
+    async getRange(dateStrs) {
+      const a = all(), out = {};
+      dateStrs.forEach((d) => { out[d] = { ...blankDay(), ...(a[d] || {}) }; });
+      return out;
+    },
     async get(dateStr) { return { ...blankDay(), ...(all()[dateStr] || {}) }; },
     async set(dateStr, data) { const a = all(); a[dateStr] = data; localStorage.setItem(KEY, JSON.stringify(a)); },
-    async getProfile() { return { ...blankProfile(), ...JSON.parse(localStorage.getItem(PKEY) || "{}") }; },
+    async getProfile() { return normalizeProfile(readProfile()); },
     async setProfile(data) { localStorage.setItem(PKEY, JSON.stringify(data)); },
+    async getAll() { return all(); },
   };
 }
 
@@ -66,25 +98,92 @@ async function start(store, user) {
   const today = iso(new Date());
   const week = weekDates();
 
-  // Load this week's days + cycle profile.
-  const days = {};
-  await Promise.all(week.map(async (d) => { days[iso(d)] = await store.get(iso(d)); }));
+  // One batched query for the week + one for the profile.
+  const weekIsos = week.map(iso);
+  const [days, loadedProfile] = await Promise.all([
+    store.getRange(weekIsos),
+    store.getProfile(),
+  ]);
+  if (!days[today]) days[today] = blankDay();
   let day = days[today];
-  let profile = await store.getProfile();
+  let profile = loadedProfile;
 
-  render();
+  /* ---------- Saving ----------
+     Taps are fast and writes are the scarcest resource (and cost money on
+     Firestore), so update the UI immediately and coalesce writes. Tapping
+     water five times becomes one write instead of five. */
+  const SAVE_DEBOUNCE_MS = 700;
+  let saveTimer = null;
+  let inFlight = Promise.resolve();
+  let dirty = false;
 
-  async function save() {
+  function save() {
     days[today] = day;
-    await store.set(today, day);
+    dirty = true;
+    setSaveStatus("saving");
     render();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
+  }
+
+  function flush() {
+    clearTimeout(saveTimer);
+    if (!dirty) return inFlight;
+    dirty = false;
+    const snapshot = JSON.parse(JSON.stringify(day));
+    // Chain writes so rapid edits can't land out of order.
+    inFlight = inFlight
+      .then(() => store.set(today, snapshot))
+      .then(() => { if (!dirty) setSaveStatus("saved"); })
+      .catch((err) => {
+        console.warn("Willow: save failed", err);
+        dirty = true;
+        setSaveStatus("error");
+      });
+    return inFlight;
   }
 
   async function saveProfile(patch) {
-    profile = { ...profile, ...patch };
-    await store.setProfile(profile);
+    profile = normalizeProfile(typeof patch === "function" ? patch(profile) : { ...profile, ...patch });
+    setSaveStatus("saving");
     render();
+    try {
+      await store.setProfile(profile);
+      setSaveStatus("saved");
+    } catch (err) {
+      console.warn("Willow: profile save failed", err);
+      setSaveStatus("error");
+    }
   }
+
+  const SAVE_LABEL = {
+    idle: ["", "var(--ink-3)"],
+    saving: ["Saving…", "var(--ink-3)"],
+    saved: ["All changes saved", "var(--good)"],
+    error: ["Couldn't save — retrying on next change", "var(--accent-ink)"],
+  };
+  let saveState = "idle";
+
+  function setSaveStatus(state) {
+    saveState = state;
+    paintSaveStatus();
+  }
+  function paintSaveStatus() {
+    const el = byId("saveStatus");
+    if (!el) return;
+    const [text, color] = SAVE_LABEL[saveState] || SAVE_LABEL.idle;
+    el.textContent = text;
+    el.style.color = color;
+  }
+
+  // Don't lose a pending write when the tab is hidden or closed.
+  // visibilitychange is the reliable one on mobile; pagehide covers bfcache.
+  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
+  addEventListener("pagehide", flush);
+
+  // First paint happens only after the save machinery above exists, since
+  // render() reads it.
+  render();
 
   function totals() {
     let minutes = 0, strength = 0;
@@ -129,6 +228,10 @@ async function start(store, user) {
           <span class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})}</span>
           <h1 style="margin:.2em 0 0">${greeting}, ${esc(name)} 🌿</h1>
           <p class="mb-0" style="max-width:52ch">Small, consistent habits in the 90 days before conception shape egg quality and hormone balance. Here's your week.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="small" id="saveStatus" aria-live="polite"></span>
+          <button class="btn btn-ghost btn-sm" id="exportBtn" title="Download all your tracked data">⬇ Export data</button>
         </div>
       </div>
 
@@ -269,6 +372,7 @@ async function start(store, user) {
       <p class="disclaimer mt-3">Educational tracking only — not medical advice or diagnosis. Discuss supplements, medications, and any symptoms with your clinician, especially if you have a chronic condition or take prescription medication.</p>
     `;
     wire();
+    paintSaveStatus();
     if (focusSel) app.querySelector(focusSel)?.focus();
   }
 
@@ -295,12 +399,17 @@ async function start(store, user) {
     });
     byId("waterPlus")?.addEventListener("click", () => { day.water++; save(); });
     byId("waterMinus")?.addEventListener("click", () => { day.water = Math.max(0, day.water-1); save(); });
-    byId("saveNotes")?.addEventListener("click", () => { day.notes = val("notes"); save(); });
+    byId("saveNotes")?.addEventListener("click", () => { day.notes = val("notes"); flush(); });
+    // Typing shouldn't re-render (it would fight the caret), so update the
+    // model directly and let the shared debounce coalesce the write.
     let noteTimer;
     byId("notes")?.addEventListener("input", () => {
+      day.notes = val("notes");
+      days[today] = day;
+      dirty = true;
+      setSaveStatus("saving");
       clearTimeout(noteTimer);
-      byId("noteStatus").textContent = "Saving…";
-      noteTimer = setTimeout(() => { day.notes = val("notes"); days[today] = day; store.set(today, day).then(()=> byId("noteStatus") && (byId("noteStatus").textContent = "Saved ✓")); }, 800);
+      noteTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
     });
     document.querySelectorAll("[data-suggest-ex]").forEach(b => b.addEventListener("click", () => {
       const s = JSON.parse(decodeURIComponent(b.dataset.suggestEx));
@@ -314,12 +423,89 @@ async function start(store, user) {
     byId("startCycle")?.addEventListener("click", () => {
       const start = val("cycleStart") || today;
       const len = Math.max(15, Math.min(60, Number(val("cycleLen")) || 28));
-      saveProfile({ lastPeriodStart: start, cycleLength: len });
+      saveProfile((p) => ({ ...addPeriodStart(p, start), cycleLength: len }));
     });
     byId("logPeriodToday")?.addEventListener("click", () => {
-      saveProfile({ lastPeriodStart: today });
+      saveProfile((p) => addPeriodStart(p, today));
     });
+    byId("addPeriodDate")?.addEventListener("click", () => {
+      const d = val("newPeriodDate");
+      if (d) saveProfile((p) => addPeriodStart(p, d));
+    });
+    byId("saveCycleLen")?.addEventListener("click", () => {
+      saveProfile({ cycleLength: Math.max(15, Math.min(60, Number(val("cycleLen")) || 28)) });
+    });
+    // Undo a mis-logged period date.
+    app.querySelectorAll("[data-del-period]").forEach((b) => b.addEventListener("click", () => {
+      saveProfile((p) => removePeriodStart(p, b.dataset.delPeriod));
+    }));
+    byId("exportBtn")?.addEventListener("click", () => exportData(store, profile, user));
   }
+}
+
+/* ---------- Export ----------
+   Health data should be portable. Everything happens client-side; nothing is
+   uploaded anywhere. */
+async function exportData(store, profile, user) {
+  const btn = byId("exportBtn");
+  const original = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Preparing…"; }
+  try {
+    const allDays = await store.getAll();
+    const dates = Object.keys(allDays).sort();
+    const stamp = iso(new Date());
+
+    download(`willow-export-${stamp}.json`, "application/json", JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      account: user?.email && user.email !== "demo mode" ? user.email : null,
+      cycle: profile,
+      days: allDays,
+    }, null, 2));
+
+    const headers = ["date", "active_minutes", "workouts", "supplements_taken", "water_cups", "meals", "notes"];
+    const rows = dates.map((d) => {
+      const v = allDays[d] || {};
+      const ex = v.exercise || [];
+      return [
+        d,
+        ex.reduce((s, e) => s + (Number(e.mins) || 0), 0),
+        ex.map((e) => `${e.title} (${e.mins}m, ${e.intensity})`).join("; "),
+        Object.entries(v.supplements || {}).filter(([, on]) => on).map(([k]) => k).join("; "),
+        v.water || 0,
+        (v.meals || []).map((m) => m.title).join("; "),
+        v.notes || "",
+      ].map(csvCell).join(",");
+    });
+    download(`willow-export-${stamp}.csv`, "text/csv", [headers.join(","), ...rows].join("\r\n"));
+
+    if (btn) btn.textContent = `✓ Exported ${dates.length} day${dates.length === 1 ? "" : "s"}`;
+  } catch (err) {
+    console.warn("Willow: export failed", err);
+    if (btn) btn.textContent = "Export failed — try again";
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      setTimeout(() => { if (byId("exportBtn")) byId("exportBtn").textContent = original; }, 3200);
+    }
+  }
+}
+
+/* Quote for CSV, and defuse spreadsheet formula injection on text cells. */
+function csvCell(value) {
+  let s = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function download(filename, mime, contents) {
+  const url = URL.createObjectURL(new Blob([contents], { type: `${mime};charset=utf-8` }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* ---------- Cycle card ---------- */
@@ -344,16 +530,33 @@ function cycleCard(profile, todayIso) {
   const dayPct = pct(cyc.cycleDay, cyc.cycleLength);
   const color = PHASE_COLOR[cyc.phase] || "var(--brand)";
   const fmt = (iso) => new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const st = cyc.stats;
+  const logged = normalizeProfile(profile).periodStarts;
+
+  // Say where the prediction came from — an average of real cycles is very
+  // different from a default guess, and the user should know which they have.
+  const basis = cyc.lengthSource === "observed"
+    ? `<span class="pill" style="background:var(--brand-soft);color:var(--brand-ink)" title="Average of your last ${st.count} cycle${st.count === 1 ? "" : "s"}">📊 Your average: ${cyc.cycleLength} days</span>`
+    : `<span class="pill muted" title="Log two or more periods and Willow will use your real average instead">Estimate: ${cyc.cycleLength} days</span>`;
+
+  const variability = st.irregular
+    ? `<div class="callout rose" style="margin:14px 0 0">
+         <p><strong>Your cycles vary by ${st.spread} days</strong> (${st.shortest}–${st.longest}). Ovulation and
+         fertile-window estimates are less reliable with irregular cycles — worth mentioning at your
+         preconception visit. <a href="guide.html#hormones">Why cycle length varies →</a></p>
+       </div>`
+    : "";
 
   return `
     <div class="card card-pad-lg mt-2" id="cycleCard">
       <div class="flex between items-center wrap gap-2 mb-2">
         <div>
           <h3 style="margin:0">🌸 Your cycle</h3>
-          <p class="small mb-0" style="margin-top:2px">Day ${cyc.cycleDay} of ~${cyc.cycleLength} · <span class="pill" style="background:color-mix(in srgb, ${color} 16%, transparent); color:${color}">${cyc.phase}</span></p>
+          <p class="small mb-0" style="margin-top:2px">Day ${cyc.cycleDay} of ~${cyc.cycleLength} · <span class="pill" style="background:color-mix(in srgb, ${color} 16%, transparent); color:${color}">${cyc.phase}</span> ${basis}</p>
         </div>
         <button class="btn btn-ghost btn-sm" id="logPeriodToday">🩸 Period started today</button>
       </div>
+      <p class="small muted" style="margin:0 0 12px">${esc(PHASE_NOTE[cyc.phase] || "")}</p>
 
       <div class="cycle-meter" role="img" aria-label="Cycle day ${cyc.cycleDay} of ${cyc.cycleLength}, phase ${cyc.phase}">
         <div class="cycle-meter-fertile" style="left:${(fertilePct.start*100).toFixed(1)}%; width:${((fertilePct.end-fertilePct.start)*100).toFixed(1)}%"></div>
@@ -368,16 +571,60 @@ function cycleCard(profile, todayIso) {
         <div class="stat-tile"><div class="label">Next period (est.)</div><div class="value" style="font-size:1.3rem">${fmt(cyc.nextPeriodDate)}</div><div class="sub">in ${cyc.daysUntilNextPeriod} day${cyc.daysUntilNextPeriod===1?"":"s"}</div></div>
       </div>
 
+      ${variability}
+
       <details class="mt-2">
-        <summary class="small" style="cursor:pointer;color:var(--ink-2);font-weight:600">Edit cycle settings</summary>
-        <div class="row-inline mt-2">
-          <div class="field"><label for="cycleStart">Last period started</label><input class="input" id="cycleStart" type="date" max="${todayIso}" value="${profile.lastPeriodStart}"></div>
-          <div class="field"><label for="cycleLen">Average cycle length</label><input class="input" id="cycleLen" type="number" min="15" max="60" value="${cyc.cycleLength}"></div>
+        <summary class="small" style="cursor:pointer;color:var(--ink-2);font-weight:600">Period history &amp; settings${logged.length ? ` (${logged.length} logged)` : ""}</summary>
+
+        <div class="mt-2">
+          <label class="small" style="font-weight:600;display:block;margin-bottom:6px">Log a past period start</label>
+          <div class="flex gap-2 wrap items-center">
+            <input class="input" id="newPeriodDate" type="date" max="${todayIso}" style="max-width:200px">
+            <button class="btn btn-ghost btn-sm" id="addPeriodDate">Add date</button>
+          </div>
         </div>
-        <button class="btn btn-ghost btn-sm" id="startCycle">Save changes</button>
+
+        ${logged.length ? `
+          <div class="mt-2">
+            <label class="small" style="font-weight:600;display:block;margin-bottom:6px">Logged periods${st.observed.length ? ` · cycle lengths: ${st.observed.slice(-6).join(", ")} days` : ""}</label>
+            <ul class="log-list">
+              ${logged.slice().reverse().map((d, i, arr) => {
+                const next = arr[i + 1];
+                const gap = next ? daysSince(next, d) : null;
+                return `<li>
+                  <span class="dot" style="background:var(--accent)"></span>
+                  <span class="li-main">${fmt(d)} <span class="muted small">${new Date(d + "T00:00:00").getFullYear()}</span></span>
+                  <span class="small muted">${gap ? `${gap}-day cycle` : ""}</span>
+                  <button class="li-del" data-del-period="${d}" aria-label="Remove ${fmt(d)}" title="Remove this date">✕</button>
+                </li>`;
+              }).join("")}
+            </ul>
+          </div>` : ""}
+
+        <div class="divider"></div>
+        ${cyc.lengthSource === "observed" ? `
+          <p class="small muted" style="margin:0">
+            Predictions use the average of your last ${st.count} cycle${st.count === 1 ? "" : "s"}
+            (<strong>${cyc.cycleLength} days</strong>). Log each period to keep it accurate.
+          </p>` : `
+          <div class="field" style="max-width:260px">
+            <label for="cycleLen">Expected cycle length</label>
+            <input class="input" id="cycleLen" type="number" min="15" max="60" value="${cyc.cycleLength}">
+          </div>
+          <button class="btn btn-ghost btn-sm" id="saveCycleLen">Save length</button>
+          <p class="small muted mt-2" style="margin-bottom:0">
+            Used until you've logged a second period — then Willow switches to your own measured average.
+          </p>`}
       </details>
-      <p class="disclaimer mt-2" style="border:none;padding-top:0">Estimates only, based on your average cycle length — not a contraceptive method. See <a href="guide.html#hormones">how your cycle works →</a></p>
+      <p class="disclaimer mt-2" style="border:none;padding-top:0">Estimates only — not a contraceptive method. See <a href="guide.html#hormones">how your cycle works →</a></p>
     </div>`;
+}
+
+/* Whole days from one ISO date to another (both date-only). */
+function daysSince(fromIso, toIso) {
+  const [fy, fm, fd] = fromIso.split("-").map(Number);
+  const [ty, tm, td] = toIso.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
 }
 
 /* ---------- Render helpers ---------- */

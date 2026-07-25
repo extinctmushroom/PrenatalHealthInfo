@@ -73,12 +73,17 @@ deployed on GitHub Pages, using Firebase for authentication and per-user data.
 
 **The dashboard** (account-gated):
 
-- 🌸 **Cycle tracker** — logs your last period and average cycle length, then computes cycle day, phase, fertile window, and estimated next period
+- 🌸 **Cycle tracker** — keeps a history of period start dates and learns your **actual average cycle length** from it, rather than assuming a textbook 28 days. Shows cycle day, phase, fertile window, and next period, and flags when your cycles are irregular enough that estimates get unreliable
 - 🏃 **Exercise tracker** — an inline-SVG weekly chart plus evidence-based workout suggestions
 - 💊 **Supplement checklist** — daily targets for folate, vitamin D, omega-3, iodine, choline, and more
 - 🥗 **Meal logging** — nutrient-focused meal ideas you can log in a tap
 - 💧 **Water tracker** and daily notes for energy, sleep, and symptoms
 - 🎯 **Progress rings & stat tiles** against weekly goals
+- ⬇️ **Data export** — download everything you've logged as JSON and CSV, generated entirely in the browser
+
+**Finding things:**
+
+- 🔎 **Instant guide search** — the seven chapters are indexed from the rendered page at load (no build step, no search library), with highlighted snippets, keyboard navigation, and `/` to focus
 
 **Accounts & data:**
 
@@ -91,6 +96,12 @@ deployed on GitHub Pages, using Firebase for authentication and per-user data.
 - Warm, accessible light/dark theme with no build step or dependencies
 - Skip-to-content link, visible focus states, `prefers-reduced-motion` support
 - Pre-paint theme application (no flash of the wrong theme) and graceful offline fallback if the Firebase SDK can't load
+
+**Performance:**
+
+- The week's data loads in a **single Firestore range query** over ISO-dated document IDs, instead of one read per day — days with no entries are never fetched or billed
+- Writes are **debounced and queued**, so tapping the water counter five times is one write rather than five, with pending changes flushed on `visibilitychange`/`pagehide` so nothing is lost
+- The cycle math is pure and dependency-free, covered by a unit-test suite (`npm test`-free — just `node`)
 
 ## Getting started
 
@@ -158,8 +169,9 @@ file needed.
 │   ├── firebase-config.js     # ← your Firebase keys go here
 │   ├── firebase-init.js       # Lazily-loaded Firebase app/auth/db instance
 │   ├── auth.js                # Sign in / sign up / route guard
-│   ├── dashboard.js           # Trackers, rings, weekly chart, storage adapters
-│   ├── cycle.js                # Menstrual cycle date math
+│   ├── dashboard.js           # Trackers, rings, weekly chart, storage adapters, export
+│   ├── cycle.js                # Menstrual cycle date math (pure, unit-tested)
+│   ├── guide-search.js         # Client-side search over the rendered guide
 │   └── content.js              # Supplement, exercise & meal suggestion data
 ├── firestore.rules             # Security rules (paste into Firebase console)
 └── assets/screenshots/          # README images

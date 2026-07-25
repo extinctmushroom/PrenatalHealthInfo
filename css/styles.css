@@ -342,6 +342,48 @@ textarea.input { resize: vertical; min-height: 76px; }
 
 .tag { display: inline-block; padding: 3px 9px; border-radius: 7px; font-size: .74rem; font-weight: 600; background: var(--surface-2); color: var(--ink-2); }
 
+/* Screen-reader-only text */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ---------- Guide search ---------- */
+.guide-search { margin-bottom: 16px; }
+.guide-search .input { font-size: .9rem; padding: 9px 12px; }
+.guide-search-results {
+  margin-top: 8px; display: flex; flex-direction: column; gap: 2px;
+  max-height: 65vh; overflow-y: auto;
+}
+.guide-search-results a {
+  display: block; padding: 9px 11px; border-radius: 9px;
+  border-left: 2px solid transparent; text-decoration: none; color: var(--ink);
+}
+.guide-search-results a:hover,
+.guide-search-results a.active {
+  background: var(--surface-2); border-left-color: var(--brand); text-decoration: none;
+}
+.guide-search-results .gs-heading { display: block; font-size: .88rem; font-weight: 600; color: var(--ink); }
+.guide-search-results .gs-chapter {
+  display: block; font-size: .72rem; color: var(--brand-ink); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .05em; margin-top: 1px;
+}
+.guide-search-results .gs-snippet {
+  display: block; font-size: .78rem; color: var(--ink-2); line-height: 1.45; margin-top: 3px;
+}
+.guide-search-results mark {
+  background: color-mix(in srgb, var(--gold) 34%, transparent);
+  color: inherit; border-radius: 3px; padding: 0 1px;
+}
+.guide-search-empty { font-size: .85rem; color: var(--ink-3); padding: 8px 11px; margin: 0; }
+/* Search lives in the sidebar, which is hidden on narrow screens — surface it
+   above the content there instead of losing the feature entirely. */
+@media (max-width: 860px) {
+  .guide-nav { display: block !important; position: static; margin-bottom: 24px; }
+  .guide-nav ul { display: none; }
+  .guide-nav .guide-search { margin-bottom: 0; }
+}
+
 /* Cycle meter (linear) */
 .cycle-meter {
   position: relative; height: 14px; border-radius: 999px; background: var(--surface-2);

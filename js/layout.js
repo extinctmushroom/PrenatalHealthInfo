@@ -100,8 +100,9 @@
   const nav = document.getElementById("navLinks");
   if (toggle && nav) toggle.addEventListener("click", () => nav.classList.toggle("open"));
 
-  // Active guide-nav scrollspy (only on guide page)
-  const spy = document.querySelectorAll(".guide-nav a");
+  // Active guide-nav scrollspy (only on guide page). Scoped to the chapter
+  // list so injected search-result links are never treated as nav items.
+  const spy = document.querySelectorAll(".guide-nav ul a");
   if (spy.length) {
     const sections = [...spy].map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
     const onScroll = () => {
